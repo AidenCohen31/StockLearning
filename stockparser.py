@@ -12,6 +12,11 @@ Misc Variables:
 import csv
 import pandas as pd
 import numpy as np
+import requests
+from bs4 import BeautifulSoup
+import json
+
+
 
 class Parser:
     '''
@@ -25,7 +30,7 @@ class Parser:
     Methods
     -------
     parse():
-      returns a dataframe with combined values from the csv files in data
+        Parses the SEC EDGAR database and returns a dataframe with SEC filing data from 10-K and 10-Q forms
      '''
     data = {}
     
@@ -42,4 +47,12 @@ class Parser:
                 for row in reader[1:]:
                     numbers.append(row + [i])
         return pd.DataFrame(np.array(numbers),columns=headers)
-        
+    
+    def scrape(self, ticker):
+        r = requests.post("https://efts.sec.gov/LATEST/search-index",data=json.dumps({"dateRange":"all","entityName":"(" + ticker +")","category":"custom", "forms":["10-Q","10-K"]}))
+        response = json.loads(r.text)
+        urls = []
+        for i in response["hits"]["hits"]:
+            sep = i["_id"].split(":")
+            urls.append("https://www.sec.gov/Archives/edgar/data/" + i["_source"]["ciks"][0] + "/" + sep[0].replace("-","") + "/" + sep[1])
+Parser({}).scrape("AAPL")
