@@ -4,6 +4,7 @@ Module that handles Data manipulation for the ML project
 
 Classes:
     Parser
+    EDGARStorage
 Functions:
     None
 Misc Variables:
@@ -21,6 +22,16 @@ import time
 
 @dataclass
 class EDGARStorage:
+    '''
+     Class that stores XML data scraped from 10-Q EDGAR form
+
+    Attributes
+    ----------
+    name : str
+        Name of XML element in GAAP Taxonomy
+    attribs: Dict[str,str]
+        Dictionary storing attributes of XML element
+    '''
     name: str
     attribs: Dict[str, str]
 
@@ -31,12 +42,18 @@ class Parser:
     Attributes
     ----------
     data : dict
-        A dictionary containing the years and relative paths of all csv files  
+        A dictionary containing the data parsed from 10-Q forms  
     
     Methods
     -------
+    scrape():
+        Parses the SEC EDGAR database and returns a list of urls with SEC filing data from 10-Q forms
+    parserecords():
+        Parses 10-Q forms and takes important information
     parse():
-        Parses the SEC EDGAR database and returns a dataframe with SEC filing data from 10-K and 10-Q forms
+        Takes in data from 10-Q forms and processes it into a pandas Dataframe
+    filterEDGAR():
+        helper method to filter through EDGAR forms
      '''
     data = {}
     def __init__(self):
@@ -53,6 +70,7 @@ class Parser:
         return pd.DataFrame(np.array(numbers),columns=headers)
     
     def scrape(self, ticker: str) -> List[str]:
+        #Found out that making a POST request to this site returns a json with the search results
         r = requests.post("https://efts.sec.gov/LATEST/search-index",data=json.dumps({"dateRange":"all","entityName":"(" + ticker +")","category":"custom", "forms":["10-Q","10-K"]}))
         response = json.loads(r.text)
         urls = []
@@ -60,6 +78,7 @@ class Parser:
             sep = i["_id"].split(":")
             urls.append("https://www.sec.gov/Archives/edgar/data/" + i["_source"]["ciks"][0] + "/" + sep[0].replace("-","") + "/" + sep[1])
         return urls
+    
     def parserecords(self, urls: List[str])-> List[List[str]]:
         contexts = {}
         for url in urls:
@@ -89,7 +108,9 @@ class Parser:
                         self.data[xmlid] = obj
             for i in self.data.items():
                 print(i)
-    def filterEDGAR(self,tag,obj,url):
+
+    def filterEDGAR(self,tag: str, obj: EDGARStorage , url: str) -> bool:
+        #Helper Method built to condense massive if statements in parserecords() by checking for conditions in an array instead
         conditions = [ "schemaRef" in tag, not "http://fasb.org/us-gaap/2020-01-31" in tag,  "TextBlock" in tag, not obj.attribs.get("contextendDate",url[-16:-8]).replace("-","") == url[-16:-8]]
         for i in range(len(conditions)):
             if( conditions[i]):
