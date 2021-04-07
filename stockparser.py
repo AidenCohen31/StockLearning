@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 import requests
 import json
+import time
 
 @dataclass
 class EDGARStorage:
@@ -62,6 +63,7 @@ class Parser:
     def parserecords(self, urls: List[str])-> List[List[str]]:
         contexts = {}
         for url in urls:
+            print(url[-16:-8])
             r = requests.get(url)
             root = ET.fromstring(r.text)
             for child in root:
@@ -70,23 +72,30 @@ class Parser:
                     attribs = {}
                     for values in child.iter():
                         attribs.update(values.attrib)
-                        attribs["context"] = values.text
+                        if(not (values.text.isspace() or not values.text)):
+                            attribs["context" + values.tag[child.tag.index("}") + 1: ] ] = values.text
                     xmlid = attribs.pop("id")
                     contexts[xmlid] = attribs
-                elif(childtag !="schemaRef" ):
-                    if( "id" not in child.attrib):
+                else:
+                    if( "id" not in child.attrib or child.attrib["id"] in self.data):
                         print(child.tag, child.attrib)
+                        continue
+                    xmlid = child.attrib.pop("id")
+                    child.attrib["value"] = child.text
+                    obj = EDGARStorage(childtag, child.attrib)
+                    if("contextRef" in child.attrib):
+                            obj.attribs.update(contexts[child.attrib["contextRef"]])
+                    if(not xmlid in self.data and self.filterEDGAR(child.tag, obj,url)):
+                        self.data[xmlid] = obj
+            for i in self.data.items():
+                print(i)
+    def filterEDGAR(self,tag,obj,url):
+        conditions = [ "schemaRef" in tag, not "http://fasb.org/us-gaap/2020-01-31" in tag,  "TextBlock" in tag, not obj.attribs.get("contextendDate",url[-16:-8]).replace("-","") == url[-16:-8]]
+        for i in range(len(conditions)):
+            if( conditions[i]):
+                return False
+        return True
 
-                    if(not child.attrib["id"] in self.data):
-                        xmlid = child.attrib.pop("id")
-                        child.attrib["value"] = child.text
-                        self.data[xmlid] = EDGARStorage(childtag, child.attrib)
-                        if("contextRef" in child.attrib):
-                            self.data[xmlid].attribs.update(contexts[child.attrib["contextRef"]])
-                    else:
-                        print(child.tag, child.attrib)
-            print(len(self.data))
-                        
-    
+
         
 Parser().parserecords(["https://www.sec.gov/Archives/edgar/data/320193/000032019321000010/aapl-20201226_htm.xml"])
