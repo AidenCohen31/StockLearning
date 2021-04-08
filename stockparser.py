@@ -35,6 +35,18 @@ class EDGARStorage:
     name: str
     attribs: Dict[str, str]
 
+@dataclass
+class Grouper:
+    '''
+     Class that groups related XML gaap elements
+
+    Attributes
+    ----------
+    elements: List[str]
+        List that stores all related elements
+    '''
+    elements: List[str]
+
 class Parser:
     '''
     Class that combines multiple .csv files into a dataframe.
@@ -61,13 +73,12 @@ class Parser:
     def parse(self)->pd.DataFrame:
         headers = []
         numbers = []
-        for i in range(2014,2019):
-            with open(self.data[i], "r") as csvfile:
-                reader = list(csv.reader(csvfile))
-                headers = reader[0] + ["Dates"]
-                for row in reader[1:]:
-                    numbers.append(row + [i])
-        return pd.DataFrame(np.array(numbers),columns=headers)
+        for i in self.data.items():
+            i = i[1]
+            grouped = [i for i in [i.name,i.attribs.get("dimension",""),i.attribs.get("contextitMember","")] if i != ""]
+            headers.append(Grouper(grouped))
+            numbers.append(i.attribs["value"])
+        
     
     def scrape(self, ticker: str) -> List[str]:
         #Found out that making a POST request to this site returns a json with the search results
@@ -106,12 +117,12 @@ class Parser:
                             obj.attribs.update(contexts[child.attrib["contextRef"]])
                     if(not xmlid in self.data and self.filterEDGAR(child.tag, obj,url)):
                         self.data[xmlid] = obj
-            for i in self.data.items():
-                print(i)
+
 
     def filterEDGAR(self,tag: str, obj: EDGARStorage , url: str) -> bool:
         #Helper Method built to condense massive if statements in parserecords() by checking for conditions in an array instead
-        conditions = [ "schemaRef" in tag, not "http://fasb.org/us-gaap/2020-01-31" in tag,  "TextBlock" in tag, not obj.attribs.get("contextendDate",url[-16:-8]).replace("-","") == url[-16:-8]]
+        conditions = [ "schemaRef" in tag, not "http://fasb.org/us-gaap/2020-01-31" in tag,  "TextBlock" in tag, 
+                    not obj.attribs.get("contextendDate",url[-16:-8]).replace("-","") == url[-16:-8], not (isinstance(obj.attribs["value"],str) and obj.attribs["value"].isnumeric())]
         for i in range(len(conditions)):
             if( conditions[i]):
                 return False
@@ -119,4 +130,7 @@ class Parser:
 
 
         
-Parser().parserecords(["https://www.sec.gov/Archives/edgar/data/320193/000032019321000010/aapl-20201226_htm.xml"])
+parser = Parser()
+parser.parserecords(["https://www.sec.gov/Archives/edgar/data/320193/000032019321000010/aapl-20201226_htm.xml"])
+parser.parse()
+
