@@ -127,10 +127,35 @@ class Parser:
             if( conditions[i]):
                 return False
         return True
+    
+    def taxonomyparser(self,tag1: str, root) ->str:
+        linkbase= "{http://www.w3.org/1999/xlink}"
+        roots = ET.fromstring(root)
+        tags = []
+        found,parent = False,""
+        for child in roots.iter():
+            childname = child.attrib.get(linkbase + "to","")
+            parentname = child.attrib.get(linkbase + "from","")
+            if(child.attrib.get("order","10") == '10'):     
+                if(found):
+                    tags.extend(self.taxonomyparser(parent,root))
+                    print(tags)
+                    return tags
+                else:
+                     tags = []
+
+            if(not found):
+                tags.append(childname)   
+            if("presentationArc" in child.tag and (tag1 == childname)):
+                print(parentname)
+                found,parent = True,parentname
+        return [tag1]
+            
 
 
         
 parser = Parser()
-parser.parserecords(["https://www.sec.gov/Archives/edgar/data/320193/000032019321000010/aapl-20201226_htm.xml"])
-parser.parse()
+parser.taxonomyparser("loc_RevenueFromContractWithCustomerExcludingAssessedTax",requests.get("https://xbrl.fasb.org/us-gaap/2021/dis/us-gaap-dis-rcc-pre-2021-01-31.xml").text)
+#parser.parserecords(["https://www.sec.gov/Archives/edgar/data/320193/000032019321000010/aapl-20201226_htm.xml"])
+#parser.parse()
 
