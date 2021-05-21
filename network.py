@@ -11,17 +11,17 @@ class NueralNetwork:
         self.answers =np.array([[answers[i]] for i in range(len(answers))])
 
     def createTraditionalNetwork(self,num):
-        self.layers.append(InputLayer(self.data,num))
+        self.layers.append(InputLayer(self.data,1,2))
         self.layers.append(ActivationLayer())
         for i in range(num):
             self.layers.append(FullyConnectedLayer(num))
             self.layers.append(ActivationLayer())
-        self.layers.append(OutputLayer(num,1))
+        self.layers.append(OutputLayer(2,1))
         self.layers.append(ActivationLayer())
     def run(self, limit):
         true_error = float("inf")
         #abs(np.sum(true_error)) > limit
-        for i in range(10000):
+        for i in range(1000):
             for i in range(len(self.layers)):
                 output = self.layers[i].forwardp()
                 if(i != len(self.layers) - 1):
@@ -30,7 +30,7 @@ class NueralNetwork:
                     vector = np.vectorize(np.sin)
                     errorarr = np.square(output-vector(self.data))
                     true_error = np.sum(errorarr)/len(errorarr)
-                    print(true_error)
+                    #print(true_error)
                     '''
                     plt.plot(self.data,output, label = "line1")
                     x = np.arange(0., 5., 0.2)
@@ -46,7 +46,9 @@ class NueralNetwork:
                     activate = np.array(self.layers[i].nodes)
                     dactivate = np.array(self.layers[i].backp())
                 elif(str(type(self.layers[i])) == "OutputLayer"):
-                    error = self.layers[i].backp(self.answers,dactivate)
+                    
+                    print(np.array([self.answers[0]]))
+                    error = self.layers[i].backp(np.array([self.answers[0]]),activate, dactivate)
                 else:
                     error = self.layers[i].backp(error, activate ,dactivate)
                     
@@ -60,7 +62,7 @@ class PrettyType(type):
 class Layer(metaclass=PrettyType):
 
     #alpha is learning rate
-    alpha = .01
+    alpha = .001
     delta = 1
     def init(self):
         inputs = []
@@ -87,28 +89,35 @@ class FullyConnectedLayer(Layer):
         std = math.sqrt(2.0/number)
         self.weights = np.array([np.random.randn(number)*std for i in range(number)])
     def forwardp(self):
+        print("FC inputs")
+        print(self.inputs)
+        print("FC weights")
+        print(self.weights)
+        print("FC Output")
+        print(np.matmul(self.inputs, self.weights) + self.bias)
         return np.matmul(self.inputs, self.weights) + self.bias
     def backp(self,error, activation, dactivation):
-        curr_error = error[:,0].reshape(100,1)
+        curr_error = error[:,0].reshape(len(self.nodes),1)
         weights = self.weights[0].reshape(2,1)
         input_error = np.multiply(np.matmul(curr_error,weights.transpose()),dactivation)
-        delta = input_error[:,0].reshape(100,1)
+        delta = input_error[:,0].reshape(len(self.nodes),1)
         for i in range(1, len(input_error[0])):
-            delta = delta + input_error[:,i].reshape(100,1)
+            delta = delta + input_error[:,i].reshape(len(self.nodes),1)
         for i in range(len(self.weights)):
             for j in range(len(input_error[0])):
-                weight_error = np.sum(np.multiply(input_error[:,j].reshape(100,1), activation[:,i].reshape(100,1)) * self.alpha)/float(len(input_error))
-                #print("weight_error: " + str(weight_error))
+                weight_error = np.sum(np.multiply(input_error[:,j].reshape(len(self.nodes),1), activation[:,i].reshape(len(self.nodes),1)) * self.alpha)/float(len(input_error))
                 self.weights[i,j] = self.weights[i,j] - weight_error
                 self.bias -= weight_error
-            curr_error = error[:,i].reshape(100,1)
+            curr_error = error[:,i].reshape(len(self.nodes),1)
             weights = self.weights[i].reshape(2,1)
             input_error = np.multiply(np.matmul(curr_error,weights.transpose()),dactivation)
             if(i!= 0):
-                temp = input_error[:,i].reshape(100,1)
+                temp = input_error[:,i].reshape(len(self.nodes),1)
                 for j in range(1, len(input_error[0])):
-                    temp = temp + input_error[:,j].reshape(100,1)
+                    temp = temp + input_error[:,j].reshape(len(self.nodes),1)
                 delta = np.concatenate((delta,temp), axis = 1)
+        print("delta")
+        print(delta)
         return delta
 
 class ActivationLayer(Layer):
@@ -139,40 +148,46 @@ class ActivationLayer(Layer):
         return self.nodes
     def forwardp(self):
         self.nodes = []
-        return self.fhelper(self.inputs,0, True)
+        #print("activation")
+        self.fhelper(self.inputs,0, True)
+        #print(self.nodes)
+        return self.nodes
     def backp(self):
         self.nodes = []
-        return self.fhelper(self.inputs, 0, False)
+        #print("dactivation")
+        self.fhelper(self.inputs, 0, False)
+        return self.nodes
 
 class InputLayer(Layer):
-    def __init__(self, inputs,number):
-        self.nodes = inputs
+    def __init__(self, inputs,number,numoutputs):
+        self.nodes = np.array([inputs[0]])
         std = math.sqrt(2.0/number)
-        numbers = np.random.randn(number)*std
-        self.weights = np.array([numbers])
+        self.weights = np.array([np.random.rand(numoutputs) * std]) 
         self.bias = 0
     def forwardp(self):
-        return np.matmul(self.nodes.reshape(100,1), self.weights) + self.bias 
+        '''
+        print("input inputs")
+        print(self.nodes)
+        print("input")
+        print(self.nodes)
+        print("input weights")
+        print(self.weights)
+        print("input output")
+        print(np.matmul(self.nodes.reshape(len(self.nodes),1), self.weights) + self.bias)
+        '''
+        return np.matmul(self.nodes.reshape(len(self.nodes),1), self.weights) + self.bias 
     def backp(self,error, activation, dactivation):
-        curr_error = error[:,0].reshape(100,1)
-        weights = self.weights[0].reshape(2,1)
-        input_error = np.multiply(np.matmul(curr_error,weights.transpose()),dactivation)
-        delta = input_error[:,0].reshape(100,1)
-        for i in range(1, len(input_error[0])):
-            delta = delta + input_error[:,i].reshape(100,1)
-        for i in range(len(self.weights)):
-            for j in range(len(input_error[0])):
-                weight_error = np.sum(np.multiply(input_error[:,j].reshape(100,1), activation[:,i].reshape(100,1)) * self.alpha)/float(len(input_error))
-                self.weights[i,j] = self.weights[i,j] - weight_error
-                self.bias -= weight_error
-            curr_error = error[:,i].reshape(100,1)
-            weights = self.weights[i].reshape(2,1)
-            input_error = np.multiply(np.matmul(curr_error,weights.transpose()),dactivation)
-            if(i!= 0):
-                temp = input_error[:,i].reshape(100,1)
-                for j in range(1, len(input_error[0])):
-                    temp = temp + input_error[:,j].reshape(100,1)
-                delta = np.concatenate((delta,temp), axis = 1)
+        delta = np.multiply(np.matmul(error,self.weights), dactivation)
+        '''
+        print("delta")
+        print(delta)
+        print("new weights")
+        '''
+        self.weights -= self.alpha * np.multiply(delta, activation)
+        #print(self.weights)
+        #print("new bias")
+        self.bias -= self.alpha * np.average(delta)
+        #print(self.bias)
         return delta
     
 
@@ -183,11 +198,21 @@ class OutputLayer(Layer):
         std = math.sqrt(2.0/number)
         self.weights = np.array([np.random.randn(1)*std for i in range(number)])
     def forwardp(self):
+        '''
+        print("output inputs")
+        print(self.inputs)
+        print("output weights")
+        print(self.weights)
+        print("Output output")
+        '''        
         return np.matmul(self.inputs, self.weights) + self.bias
-    def backp(self, expected, dactivation):
+    def backp(self, expected, activation, dactivation):
         vector = np.vectorize(self.dcost)
-        answers = vector(np.multiply(np.subtract(self.forwardp(),expected),dactivation))
-        return np.concatenate((answers,answers),axis=1)
+        answers = np.multiply(vector(np.subtract(self.forwardp(),expected)), dactivation)
+        print(answers)
+        self.weights = self.weights - (self.alpha * np.multiply(answers, activation))
+        self.bias -= self.alpha * answers
+        return answers
     
 
 '''
@@ -202,7 +227,7 @@ y = np.sin(x)
 
 nueral = NueralNetwork(x,y)
 
-nueral.createTraditionalNetwork(2)
+nueral.createTraditionalNetwork(0)
 nueral.run(.1)
 
         
